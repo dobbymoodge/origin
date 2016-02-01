@@ -481,6 +481,10 @@ func init() {
 					Verbs:     sets.NewString("create", "delete"),
 					Resources: sets.NewString("pods"),
 				},
+				{
+					Verbs:     sets.NewString("create"),
+					Resources: sets.NewString("pods/binding"),
+				},
 				// DaemonSetsController.podControl.recorder
 				{
 					Verbs:     sets.NewString("create", "update", "patch"),

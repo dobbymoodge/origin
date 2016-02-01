@@ -45,7 +45,7 @@ import (
 )
 
 // AdmissionPlugins is the full list of admission control plugins to enable in the order they must run
-var AdmissionPlugins = []string{"NamespaceLifecycle", "OriginPodNodeEnvironment", overrideapi.PluginName, "LimitRanger", "ServiceAccount", "SecurityContextConstraint", "BuildDefaults", "BuildOverrides", "ResourceQuota", "SCCExecRestrictions"}
+var AdmissionPlugins = []string{"NamespaceLifecycle", "PodNodeConstraints", "OriginPodNodeEnvironment", overrideapi.PluginName, "LimitRanger", "ServiceAccount", "SecurityContextConstraint", "BuildDefaults", "BuildOverrides", "ResourceQuota", "SCCExecRestrictions"}
 
 // MasterConfig defines the required values to start a Kubernetes master
 type MasterConfig struct {
@@ -130,10 +130,16 @@ func BuildKubernetesMasterConfig(options configapi.MasterConfig, requestContextM
 		glog.V(2).Infof("Successfully initialized cloud provider: %q from the config file: %q\n", server.CloudProvider, server.CloudConfigFile)
 	}
 
+	privilegedLoopbackOpenShiftClient, _, err := configapi.GetOpenShiftClient(options.MasterClients.OpenShiftLoopbackKubeConfig)
+	if err != nil {
+		return nil, err
+	}
+
 	// This is a placeholder to provide additional initialization
 	// objects to plugins
 	pluginInitializer := oadmission.PluginInitializer{
-		ProjectCache: projectCache,
+		OpenshiftClient: privilegedLoopbackOpenShiftClient,
+		ProjectCache:    projectCache,
 	}
 
 	plugins := []admission.Interface{}
