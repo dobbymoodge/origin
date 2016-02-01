@@ -1162,6 +1162,12 @@ items:
   - apiGroups: null
     attributeRestrictions: null
     resources:
+    - pods/binding
+    verbs:
+    - create
+  - apiGroups: null
+    attributeRestrictions: null
+    resources:
     - events
     verbs:
     - create
