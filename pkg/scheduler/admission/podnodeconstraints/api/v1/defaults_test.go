@@ -9,14 +9,13 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 
-	v1 "github.com/openshift/origin/pkg/api/v1"
 	_ "github.com/openshift/origin/pkg/deploy/api/install"
 
 	podnodeconstraintsv1 "github.com/openshift/origin/pkg/scheduler/admission/podnodeconstraints/api/v1"
 )
 
 func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
-	data, err := runtime.Encode(kapi.Codecs.LegacyCodec(v1.SchemeGroupVersion), obj)
+	data, err := runtime.Encode(kapi.Codecs.LegacyCodec(podnodeconstraintsv1.SchemeGroupVersion), obj)
 	if err != nil {
 		t.Errorf("%v\n %#v", err, obj)
 		return nil
