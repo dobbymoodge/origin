@@ -10,6 +10,7 @@ var SchemeGroupVersion = unversioned.GroupVersion{Group: "", Version: "v1"}
 
 func AddToScheme(scheme *runtime.Scheme) {
 	addKnownTypes(scheme)
+	addDefaultingFuncs(scheme)
 }
 
 func addKnownTypes(scheme *runtime.Scheme) {

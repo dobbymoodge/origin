@@ -81,7 +81,7 @@ func TestPodNodeConstraints(tt *testing.T) {
 			userinfo:         serviceaccount.UserInfo("", "", ""),
 			reviewResponse:   reviewResponse(false, ""),
 			expectedResource: "pods/bind",
-			expectedErrorMsg: "Binding pods to particular nodes is prohibited by policy for your role",
+			expectedErrorMsg: "Binding nodes by nodeName is prohibited by policy for your role",
 		},
 		// 2: expect nodeSelector to error with user which lacks "pods/bind" access
 		{
@@ -126,7 +126,7 @@ func TestPodNodeConstraints(tt *testing.T) {
 			userinfo:         serviceaccount.UserInfo("herpy", "derpy", ""),
 			reviewResponse:   reviewResponse(false, ""),
 			expectedResource: "pods/bind",
-			expectedErrorMsg: "Binding pods to particular nodes is prohibited by policy for your role",
+			expectedErrorMsg: "Binding nodes by nodeName is prohibited by policy for your role",
 		},
 	}
 	for ii, tc := range tests {

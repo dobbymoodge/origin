@@ -62,7 +62,7 @@ func readConfig(reader io.Reader) (*api.PodNodeConstraintsConfig, error) {
 	if !ok {
 		return nil, fmt.Errorf("unexpected config object: %#v", obj)
 	}
-	// No validation needed since config is just 1 bool
+	// No validation needed since config is just list of strings
 	return config, nil
 }
 
@@ -116,24 +116,31 @@ func (o *podNodeConstraints) getPodSpec(attr admission.Attributes) (kapi.PodSpec
 
 // validate PodSpec if NodeName or NodeSelector are specified
 func (o *podNodeConstraints) admitPodSpec(attr admission.Attributes, ps kapi.PodSpec) error {
-	allow := o.checkPodsBindAccess(attr)
-	// nodeName constraint
-	if allow != nil {
-		if len(ps.NodeName) > 0 {
-			return allow
-		}
-		// nodeSelector blacklist filter
-		if len(ps.NodeSelector) > 0 {
-			lbls := []string{}
-			for nslbl := range ps.NodeSelector {
-				for _, bllbl := range o.config.NodeSelectorLabelBlacklist {
-					if bllbl == nslbl {
-						lbls = append(lbls, bllbl)
-					}
+	lbls := []string{}
+	// nodeSelector blacklist filter
+	if len(ps.NodeSelector) > 0 {
+		for nslbl := range ps.NodeSelector {
+			for _, bllbl := range o.config.NodeSelectorLabelBlacklist {
+				if bllbl == nslbl {
+					lbls = append(lbls, bllbl)
 				}
 			}
-			if len(lbls) > 0 {
+		}
+	}
+	// nodeName constraint
+	if len(ps.NodeName) > 0 || len(lbls) > 0 {
+		allow, err := o.checkPodsBindAccess(attr)
+		if err != nil {
+			return err
+		}
+		if allow != nil && !allow.Allowed {
+			switch {
+			case len(ps.NodeName) > 0, len(lbls) == 0:
+				return admission.NewForbidden(attr, fmt.Errorf("Binding nodes by nodeName is prohibited by policy for your role"))
+			case len(ps.NodeName) == 0, len(lbls) > 0:
 				return admission.NewForbidden(attr, fmt.Errorf("Node selection by label(s) %v is prohibited by policy for your role", lbls))
+			case len(ps.NodeName) > 0, len(lbls) > 0:
+				return admission.NewForbidden(attr, fmt.Errorf("Binding nodes by nodeName and node selection by label(s) %v is prohibited by policy for your role", lbls))
 			}
 		}
 	}
@@ -152,7 +159,7 @@ func (o *podNodeConstraints) Validate() error {
 }
 
 // build LocalSubjectAccessReview struct to validate role via checkAccess
-func (o *podNodeConstraints) checkPodsBindAccess(attr admission.Attributes) error {
+func (o *podNodeConstraints) checkPodsBindAccess(attr admission.Attributes) (*authorizationapi.SubjectAccessReviewResponse, error) {
 	sar := &authorizationapi.LocalSubjectAccessReview{
 		Action: authorizationapi.AuthorizationAttributes{
 			Verb:         "create",
@@ -162,17 +169,6 @@ func (o *podNodeConstraints) checkPodsBindAccess(attr admission.Attributes) erro
 		User:   attr.GetUserInfo().GetName(),
 		Groups: sets.NewString(attr.GetUserInfo().GetGroups()...),
 	}
-	return o.checkAccess(attr, sar)
-}
-
-// Handle response for LocalSubjectAccessReview
-func (o *podNodeConstraints) checkAccess(attr admission.Attributes, sar *authorizationapi.LocalSubjectAccessReview) error {
-	resp, err := o.client.LocalSubjectAccessReviews(attr.GetNamespace()).Create(sar)
-	if err != nil {
-		return err
-	}
-	if !resp.Allowed {
-		return admission.NewForbidden(attr, fmt.Errorf("Binding pods to particular nodes is prohibited by policy for your role"))
-	}
-	return nil
+	// return o.checkAccess(attr, sar)
+	return o.client.LocalSubjectAccessReviews(attr.GetNamespace()).Create(sar)
 }
