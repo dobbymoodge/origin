@@ -116,7 +116,7 @@ func init() {
 				// BuildControllerFactory.buildDeleteLW
 				{
 					Verbs:     sets.NewString("get", "list", "create", "delete"),
-					Resources: sets.NewString("pods", "pods/bind"),
+					Resources: sets.NewString("pods"),
 				},
 				// BuildController.Recorder (EventBroadcaster)
 				{
@@ -150,7 +150,7 @@ func init() {
 				// DeploymentController.podClient
 				{
 					Verbs:     sets.NewString("get", "list", "create", "delete", "update"),
-					Resources: sets.NewString("pods", "pods/bind"),
+					Resources: sets.NewString("pods"),
 				},
 				// DeploymentController.recorder (EventBroadcaster)
 				{
@@ -195,7 +195,7 @@ func init() {
 				// ReplicationManager.podControl (RealPodControl)
 				{
 					Verbs:     sets.NewString("create", "delete"),
-					Resources: sets.NewString("pods", "pods/bind"),
+					Resources: sets.NewString("pods"),
 				},
 				// ReplicationManager.podControl.recorder
 				{
@@ -236,7 +236,7 @@ func init() {
 				// JobController.podControl (RealPodControl)
 				{
 					Verbs:     sets.NewString("create", "delete"),
-					Resources: sets.NewString("pods", "pods/bind"),
+					Resources: sets.NewString("pods"),
 				},
 				// JobController.podControl.recorder
 				{
@@ -345,7 +345,7 @@ func init() {
 				// PersistentVolumeRecycler.reclaimVolume() -> handleRecycle()
 				{
 					Verbs:     sets.NewString("get", "create", "delete"),
-					Resources: sets.NewString("pods", "pods/bind"),
+					Resources: sets.NewString("pods"),
 				},
 				// PersistentVolumeRecycler.reclaimVolume() -> handleRecycle()
 				{
@@ -479,7 +479,11 @@ func init() {
 				// DaemonSetsController.podControl (RealPodControl)
 				{
 					Verbs:     sets.NewString("create", "delete"),
-					Resources: sets.NewString("pods", "pods/bind"),
+					Resources: sets.NewString("pods"),
+				},
+				{
+					Verbs:     sets.NewString("create"),
+					Resources: sets.NewString("pods/bind"),
 				},
 				// DaemonSetsController.podControl.recorder
 				{

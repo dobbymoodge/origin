@@ -90,7 +90,7 @@ func (o *podNodeConstraints) Admit(attr admission.Attributes) error {
 	if err == nil {
 		return o.admitPodSpec(attr, ps)
 	}
-	return nil
+	return err
 }
 
 // extract the PodSpec from the pod templates for each object we care about

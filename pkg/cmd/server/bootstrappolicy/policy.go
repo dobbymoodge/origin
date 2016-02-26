@@ -286,7 +286,7 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 					// RecreateDeploymentStrategy.hookExecutor
 					// RollingDeploymentStrategy.hookExecutor
 					Verbs:     sets.NewString("get", "list", "watch", "create"),
-					Resources: sets.NewString("pods", "pods/bind"),
+					Resources: sets.NewString("pods"),
 				},
 				{
 					// RecreateDeploymentStrategy.hookExecutor
@@ -463,7 +463,7 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 					// TODO: restrict deletion to mirror pods created by the bound node once supported
 					// Needed for the node to create/delete mirror pods
 					Verbs:     sets.NewString("get", "create", "delete"),
-					Resources: sets.NewString("pods", "pods/bind"),
+					Resources: sets.NewString("pods"),
 				},
 				{
 					// TODO: restrict to pods scheduled on the bound node once supported
