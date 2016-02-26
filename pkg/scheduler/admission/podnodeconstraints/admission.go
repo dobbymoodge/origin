@@ -116,10 +116,25 @@ func (o *podNodeConstraints) getPodSpec(attr admission.Attributes) (kapi.PodSpec
 
 // validate PodSpec if NodeName or NodeSelector are specified
 func (o *podNodeConstraints) admitPodSpec(attr admission.Attributes, ps kapi.PodSpec) error {
-	if len(ps.NodeName) > 0 || len(ps.NodeSelector) > 0 {
-		allow := o.checkPodsBindAccess(attr)
-		if allow != nil && o.config.ProhibitNodeTargeting {
+	allow := o.checkPodsBindAccess(attr)
+	// nodeName constraint
+	if allow != nil {
+		if len(ps.NodeName) > 0 {
 			return allow
+		}
+		// nodeSelector blacklist filter
+		if len(ps.NodeSelector) > 0 {
+			lbls := []string{}
+			for nslbl := range ps.NodeSelector {
+				for _, bllbl := range o.config.NodeSelectorLabelBlacklist {
+					if bllbl == nslbl {
+						lbls = append(lbls, bllbl)
+					}
+				}
+			}
+			if len(lbls) > 0 {
+				return admission.NewForbidden(attr, fmt.Errorf("Node selection by label(s) %v is prohibited by policy for your role", lbls))
+			}
 		}
 	}
 	return nil

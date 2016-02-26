@@ -24,20 +24,11 @@ func emptyConfig() *api.PodNodeConstraintsConfig {
 	return &api.PodNodeConstraintsConfig{}
 }
 
-func testConfig(a bool) *api.PodNodeConstraintsConfig {
+func testConfig() *api.PodNodeConstraintsConfig {
 	return &api.PodNodeConstraintsConfig{
-		// Whitelist: []kapi.ObjectReference{
-		// 	{
-		// 		Kind:            "ServiceAccount",
-		// 		Namespace:       "openshift-infra",
-		// 		Name:            "daemonset-controller",
-		// 		UID:             "",
-		// 		APIVersion:      "",
-		// 		ResourceVersion: "",
-		// 		FieldPath:       "",
-		// 	},
-		// },
-		ProhibitNodeTargeting: a,
+		NodeSelectorLabelBlacklist: []string{
+			"bogus",
+		},
 	}
 }
 
@@ -83,54 +74,54 @@ func TestPodNodeConstraints(tt *testing.T) {
 			expectedResource: "pods/bind",
 			expectedErrorMsg: "",
 		},
-		// 1: expect nodeName to error on ProhibitNodeTargeting = true
+		// 1: expect nodeName to error with user which lacks "pods/bind" access
 		{
-			config:           testConfig(true),
+			config:           testConfig(),
 			pod:              nodeNamePod(),
 			userinfo:         serviceaccount.UserInfo("", "", ""),
 			reviewResponse:   reviewResponse(false, ""),
 			expectedResource: "pods/bind",
 			expectedErrorMsg: "Binding pods to particular nodes is prohibited by policy for your role",
 		},
-		// 2: expect nodeSelector to error on ProhibitNodeTargeting = true
+		// 2: expect nodeSelector to error with user which lacks "pods/bind" access
 		{
-			config:           testConfig(true),
+			config:           testConfig(),
 			pod:              nodeSelectorPod(),
 			userinfo:         serviceaccount.UserInfo("", "", ""),
 			reviewResponse:   reviewResponse(false, ""),
 			expectedResource: "pods/bind",
-			expectedErrorMsg: "Binding pods to particular nodes is prohibited by policy for your role",
+			expectedErrorMsg: "Node selection by label(s) [bogus] is prohibited by policy for your role",
 		},
-		// 3: expect empty nodeSelector to succeed on ProhibitNodeTargeting = true
+		// 3: expect empty nodeSelector to succeed
 		{
-			config:           testConfig(true),
+			config:           testConfig(),
 			pod:              emptyNodeSelectorPod(),
 			userinfo:         serviceaccount.UserInfo("", "", ""),
 			reviewResponse:   reviewResponse(false, ""),
 			expectedResource: "pods/bind",
 			expectedErrorMsg: "",
 		},
-		// 4: expect nodeSelector to succeed on ProhibitNodeTargeting = true with user that has "pods/bind" access
+		// 4: expect nodeSelector to succeed with user that has "pods/bind" access
 		{
-			config:           testConfig(true),
+			config:           testConfig(),
 			pod:              nodeSelectorPod(),
 			userinfo:         serviceaccount.UserInfo("openshift-infra", "daemonset-controller", ""),
 			reviewResponse:   reviewResponse(true, ""),
 			expectedResource: "pods/bind",
 			expectedErrorMsg: "",
 		},
-		// 5: expect nodeName to succeed on ProhibitNodeTargeting = true with user that has "pods/bind" access
+		// 5: expect nodeName to succeed with user that has "pods/bind" access
 		{
-			config:           testConfig(true),
+			config:           testConfig(),
 			pod:              nodeNamePod(),
 			userinfo:         serviceaccount.UserInfo("openshift-infra", "daemonset-controller", ""),
 			reviewResponse:   reviewResponse(true, ""),
 			expectedResource: "pods/bind",
 			expectedErrorMsg: "",
 		},
-		// 6: expect nodeName to fail on ProhibitNodeTargeting = true with user that lacks "pods/bind" access
+		// 6: expect nodeName to fail with user that lacks "pods/bind" access
 		{
-			config:           testConfig(true),
+			config:           testConfig(),
 			pod:              nodeNamePod(),
 			userinfo:         serviceaccount.UserInfo("herpy", "derpy", ""),
 			reviewResponse:   reviewResponse(false, ""),
@@ -190,14 +181,16 @@ func reviewResponse(allowed bool, msg string) *authorizationapi.SubjectAccessRev
 func TestReadConfig(t *testing.T) {
 	configStr := `apiVersion: v1
 kind: PodNodeConstraintsConfig
-prohibitNodeTargeting: true
+nodeSelectorLabelBlacklist:
+  - bogus
+  - foo
 `
 	buf := bytes.NewBufferString(configStr)
 	config, err := readConfig(buf)
 	if err != nil {
 		t.Fatalf("unexpected error reading config: %v", err)
 	}
-	if config.ProhibitNodeTargeting != true {
-		t.Fatalf("ProhibitNodeName didn't take specified value")
+	if len(config.NodeSelectorLabelBlacklist) == 0 {
+		t.Fatalf("NodeSelectorLabelBlacklist didn't take specified value")
 	}
 }

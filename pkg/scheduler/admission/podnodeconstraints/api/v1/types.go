@@ -5,11 +5,13 @@ import (
 )
 
 // PodNodeConstraintsConfig is the configuration for the pod node name
-// and node selector constraint plug-in. It contains a boolean to
-// allow or prohibit the use of nodeName and nodeSelector fields in
-// pod requests.
+// and node selector constraint plug-in. For accounts, serviceaccounts
+// and groups which lack the "pods/bind" permission, Loading this
+// plugin will prevent setting NodeName on pod specs and will prevent
+// setting NodeSelectors whose labels appear in the blacklist field
+// "NodeSelectorLabelBlacklist"
 type PodNodeConstraintsConfig struct {
 	unversioned.TypeMeta
-	// ProhibitNodeTargeting determines if policy allows targeting specific nodes via nodeName or nodeSelector in the pod spec.
-	ProhibitNodeTargeting bool `json:"prohibitNodeTargeting",description:"prevent unauthorized users from scheduling pods against specific nodes"`
+	// NodeSelectorLabelBlacklist specifies a list of labels which cannot be set by entities without the "pods/bind" permission
+	NodeSelectorLabelBlacklist []string `json:"nodeSelectorLabelBlacklist",description:"list of labels which cannot be set by entities without the 'pods/bind' permission"`
 }
