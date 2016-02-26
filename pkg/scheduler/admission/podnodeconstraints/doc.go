@@ -36,6 +36,7 @@ kubernetesMasterConfig:
         configuration:
           apiVersion: v1
           kind: PodNodeConstraintsConfig
+          nodeSelectorLabelBlacklist:
             - label1
             - label2
 */

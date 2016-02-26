@@ -61,10 +61,8 @@ func TestPodNodeConstraintsAdmissionPluginDefaults(t *testing.T) {
 	}
 }
 
-func TestPodNodeConstraintsAdmissionPluginProhibitNodeTargeting(t *testing.T) {
-	config := &pluginapi.PodNodeConstraintsConfig{
-		ProhibitNodeTargeting: true,
-	}
+func TestPodNodeConstraintsAdmissionPluginSetNodeName(t *testing.T) {
+	config := &pluginapi.PodNodeConstraintsConfig{}
 	ns := "test-project"
 	oclient, kclient := setupUserPodNodeConstraintsTest(t, config, ns, "derples")
 	expectedError := testPodNodeConstraintsExpectedError("Binding pods to particular nodes is prohibited by policy for your role")
@@ -84,8 +82,10 @@ func TestPodNodeConstraintsAdmissionPluginProhibitNodeTargeting(t *testing.T) {
 	}
 }
 
-func TestPodNodeConstraintsAdmissionPluginWithDaemonSet(t *testing.T) {
-	config := &pluginapi.PodNodeConstraintsConfig{}
+func TestPodNodeConstraintsAdmissionPluginSetNodeSelectorWithDaemonSet(t *testing.T) {
+	config := &pluginapi.PodNodeConstraintsConfig{
+		NodeSelectorLabelBlacklist: []string{"foo"},
+	}
 	ns := kapi.NamespaceDefault
 	kclient := setupClusterAdminPodNodeConstraintsTest(t, config)
 
@@ -104,7 +104,7 @@ func TestPodNodeConstraintsAdmissionPluginWithDaemonSet(t *testing.T) {
 	checkErr(t, err)
 
 	dsTemplate := newValidDaemonSet()
-
+	dsTemplate.Spec.Template.Spec.NodeSelector = map[string]string{"foo": "bar"}
 	_, err = kclient.Extensions().DaemonSets(ns).Create(dsTemplate)
 	checkErr(t, err)
 
@@ -131,7 +131,7 @@ func TestPodNodeConstraintsAdmissionPluginWithDaemonSet(t *testing.T) {
 
 func TestPodNodeConstraintsAdmissionPluginWithDaemonSetProhibitNodeTargeting(t *testing.T) {
 	config := &pluginapi.PodNodeConstraintsConfig{
-		ProhibitNodeTargeting: true,
+		NodeSelectorLabelBlacklist: []string{"foo"},
 	}
 	ns := kapi.NamespaceDefault
 	kclient := setupClusterAdminPodNodeConstraintsTest(t, config)
@@ -212,6 +212,7 @@ func newValidDaemonSet() *extensions.DaemonSet {
 }
 
 func setupClusterAdminPodNodeConstraintsTest(t *testing.T, pluginConfig *pluginapi.PodNodeConstraintsConfig) kclient.Interface {
+	testutil.RequireEtcd(t)
 	masterConfig, err := testserver.DefaultMasterOptions()
 	if err != nil {
 		t.Fatalf("error creating config: %v", err)
@@ -242,6 +243,7 @@ func setupClusterAdminPodNodeConstraintsTest(t *testing.T, pluginConfig *plugina
 }
 
 func setupUserPodNodeConstraintsTest(t *testing.T, pluginConfig *pluginapi.PodNodeConstraintsConfig, namespace string, user string) (*client.Client, *kclient.Client) {
+	testutil.RequireEtcd(t)
 	masterConfig, err := testserver.DefaultMasterOptions()
 	if err != nil {
 		t.Fatalf("error creating config: %v", err)
