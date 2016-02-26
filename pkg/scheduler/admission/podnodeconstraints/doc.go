@@ -1,9 +1,18 @@
 /*
 Package podnodeconstraints contains the PodNodeConstraints admission
-control plugin. This plugin allows administrators to prohibit the use
-of the NodeName and NodeSelector attributes in pod specs. This enables
-policy to prevent pod requests from influencing which nodes new pods
-are scheduled on.
+control plugin. This plugin allows administrators to set policy
+governing the use of the NodeName and NodeSelector attributes in pod
+specs.
+
+Enabling this plugin will prevent the use of the NodeName field in Pod
+templates for users and serviceaccounts which lack the "pods/bind"
+permission, and which don't belong to groups which have the
+"pods/bind" permission.
+
+This plugin will also prevent users, serviceaccounts and groups which
+lack the "pods/bind" permission from specifying the NodeSelector field
+in Pod templates for labels which appear in the
+nodeSelectorLabelBlacklist list field.
 
 Configuration
 
@@ -16,7 +25,9 @@ admissionConfig:
         configuration:
           apiVersion: v1
           kind: PodNodeConstraintsConfig
-          prohibitNodeTargeting: true
+          nodeSelectorLabelBlacklist:
+            - label1
+            - label2
 ...
 kubernetesMasterConfig:
   admissionConfig:
@@ -25,7 +36,8 @@ kubernetesMasterConfig:
         configuration:
           apiVersion: v1
           kind: PodNodeConstraintsConfig
-          prohibitNodeTargeting: true
+            - label1
+            - label2
 */
 
 package podnodeconstraints
