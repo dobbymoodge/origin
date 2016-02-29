@@ -71,25 +71,25 @@ func TestPodNodeConstraints(tt *testing.T) {
 			pod:              defaultPod(),
 			userinfo:         serviceaccount.UserInfo("", "", ""),
 			reviewResponse:   reviewResponse(false, ""),
-			expectedResource: "pods/bind",
+			expectedResource: "pods/binding",
 			expectedErrorMsg: "",
 		},
-		// 1: expect nodeName to error with user which lacks "pods/bind" access
+		// 1: expect nodeName to error with user which lacks "pods/binding" access
 		{
 			config:           testConfig(),
 			pod:              nodeNamePod(),
 			userinfo:         serviceaccount.UserInfo("", "", ""),
 			reviewResponse:   reviewResponse(false, ""),
-			expectedResource: "pods/bind",
+			expectedResource: "pods/binding",
 			expectedErrorMsg: "Binding nodes by nodeName is prohibited by policy for your role",
 		},
-		// 2: expect nodeSelector to error with user which lacks "pods/bind" access
+		// 2: expect nodeSelector to error with user which lacks "pods/binding" access
 		{
 			config:           testConfig(),
 			pod:              nodeSelectorPod(),
 			userinfo:         serviceaccount.UserInfo("", "", ""),
 			reviewResponse:   reviewResponse(false, ""),
-			expectedResource: "pods/bind",
+			expectedResource: "pods/binding",
 			expectedErrorMsg: "Node selection by label(s) [bogus] is prohibited by policy for your role",
 		},
 		// 3: expect empty nodeSelector to succeed
@@ -98,34 +98,34 @@ func TestPodNodeConstraints(tt *testing.T) {
 			pod:              emptyNodeSelectorPod(),
 			userinfo:         serviceaccount.UserInfo("", "", ""),
 			reviewResponse:   reviewResponse(false, ""),
-			expectedResource: "pods/bind",
+			expectedResource: "pods/binding",
 			expectedErrorMsg: "",
 		},
-		// 4: expect nodeSelector to succeed with user that has "pods/bind" access
+		// 4: expect nodeSelector to succeed with user that has "pods/binding" access
 		{
 			config:           testConfig(),
 			pod:              nodeSelectorPod(),
 			userinfo:         serviceaccount.UserInfo("openshift-infra", "daemonset-controller", ""),
 			reviewResponse:   reviewResponse(true, ""),
-			expectedResource: "pods/bind",
+			expectedResource: "pods/binding",
 			expectedErrorMsg: "",
 		},
-		// 5: expect nodeName to succeed with user that has "pods/bind" access
+		// 5: expect nodeName to succeed with user that has "pods/binding" access
 		{
 			config:           testConfig(),
 			pod:              nodeNamePod(),
 			userinfo:         serviceaccount.UserInfo("openshift-infra", "daemonset-controller", ""),
 			reviewResponse:   reviewResponse(true, ""),
-			expectedResource: "pods/bind",
+			expectedResource: "pods/binding",
 			expectedErrorMsg: "",
 		},
-		// 6: expect nodeName to fail with user that lacks "pods/bind" access
+		// 6: expect nodeName to fail with user that lacks "pods/binding" access
 		{
 			config:           testConfig(),
 			pod:              nodeNamePod(),
 			userinfo:         serviceaccount.UserInfo("herpy", "derpy", ""),
 			reviewResponse:   reviewResponse(false, ""),
-			expectedResource: "pods/bind",
+			expectedResource: "pods/binding",
 			expectedErrorMsg: "Binding nodes by nodeName is prohibited by policy for your role",
 		},
 	}

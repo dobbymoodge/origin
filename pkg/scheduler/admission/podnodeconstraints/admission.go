@@ -160,12 +160,11 @@ func (o *podNodeConstraints) checkPodsBindAccess(attr admission.Attributes) (*au
 	sar := &authorizationapi.LocalSubjectAccessReview{
 		Action: authorizationapi.AuthorizationAttributes{
 			Verb:         "create",
-			Resource:     "pods/bind",
+			Resource:     "pods/binding",
 			ResourceName: attr.GetName(),
 		},
 		User:   attr.GetUserInfo().GetName(),
 		Groups: sets.NewString(attr.GetUserInfo().GetGroups()...),
 	}
-	// return o.checkAccess(attr, sar)
 	return o.client.LocalSubjectAccessReviews(attr.GetNamespace()).Create(sar)
 }

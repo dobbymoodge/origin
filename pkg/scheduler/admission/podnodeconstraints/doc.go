@@ -5,12 +5,12 @@ governing the use of the NodeName and NodeSelector attributes in pod
 specs.
 
 Enabling this plugin will prevent the use of the NodeName field in Pod
-templates for users and serviceaccounts which lack the "pods/bind"
+templates for users and serviceaccounts which lack the "pods/binding"
 permission, and which don't belong to groups which have the
-"pods/bind" permission.
+"pods/binding" permission.
 
 This plugin will also prevent users, serviceaccounts and groups which
-lack the "pods/bind" permission from specifying the NodeSelector field
+lack the "pods/binding" permission from specifying the NodeSelector field
 in Pod templates for labels which appear in the
 nodeSelectorLabelBlacklist list field.
 
