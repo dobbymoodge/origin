@@ -77,7 +77,6 @@ func (o *podNodeConstraints) Admit(attr admission.Attributes) error {
 	switch attr.GetResource() {
 	case kapi.Resource("pods"),
 		kapi.Resource("replicationcontrollers"),
-		extensions.Resource("daemonsets"),
 		extensions.Resource("deployments"),
 		extensions.Resource("replicasets"),
 		extensions.Resource("jobs"),
@@ -99,8 +98,6 @@ func (o *podNodeConstraints) getPodSpec(attr admission.Attributes) (kapi.PodSpec
 	case *kapi.Pod:
 		return r.Spec, nil
 	case *kapi.ReplicationController:
-		return r.Spec.Template.Spec, nil
-	case *extensions.DaemonSet:
 		return r.Spec.Template.Spec, nil
 	case *extensions.Deployment:
 		return r.Spec.Template.Spec, nil
