@@ -11,7 +11,8 @@ import (
 // setting NodeSelectors whose labels appear in the blacklist field
 // "NodeSelectorLabelBlacklist"
 type PodNodeConstraintsConfig struct {
-	unversioned.TypeMeta
+	unversioned.TypeMeta `json:",inline"`
+
 	// NodeSelectorLabelBlacklist specifies a list of labels which cannot be set by entities without the "pods/binding" permission
 	NodeSelectorLabelBlacklist []string `json:"nodeSelectorLabelBlacklist",description:"list of labels which cannot be set by entities without the 'pods/binding' permission"`
 }
