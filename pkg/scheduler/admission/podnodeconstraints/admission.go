@@ -30,6 +30,8 @@ func init() {
 	})
 }
 
+// NewPodNodeConstraints creates a new admission plugin to prevent objects that contain pod templates
+// from containing node bindings by name or selector based on role permissions.
 func NewPodNodeConstraints(config *api.PodNodeConstraintsConfig) admission.Interface {
 	return &podNodeConstraints{
 		config:  config,
@@ -133,11 +135,11 @@ func (o *podNodeConstraints) admitPodSpec(attr admission.Attributes, ps kapi.Pod
 		if allow != nil && !allow.Allowed {
 			switch {
 			case len(ps.NodeName) > 0, len(lbls) == 0:
-				return admission.NewForbidden(attr, fmt.Errorf("Binding nodes by nodeName is prohibited by policy for your role"))
+				return admission.NewForbidden(attr, fmt.Errorf("node selection by nodeName is prohibited by policy for your role"))
 			case len(ps.NodeName) == 0, len(lbls) > 0:
-				return admission.NewForbidden(attr, fmt.Errorf("Node selection by label(s) %v is prohibited by policy for your role", lbls))
+				return admission.NewForbidden(attr, fmt.Errorf("node selection by label(s) %v is prohibited by policy for your role", lbls))
 			case len(ps.NodeName) > 0, len(lbls) > 0:
-				return admission.NewForbidden(attr, fmt.Errorf("Binding nodes by nodeName and node selection by label(s) %v is prohibited by policy for your role", lbls))
+				return admission.NewForbidden(attr, fmt.Errorf("node selection by nodeName and label(s) %v is prohibited by policy for your role", lbls))
 			}
 		}
 	}
