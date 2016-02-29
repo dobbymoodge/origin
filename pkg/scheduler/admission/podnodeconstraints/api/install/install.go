@@ -15,6 +15,7 @@ const importPrefix = "github.com/openshift/origin/pkg/scheduler/admission/podnod
 
 var accessor = meta.NewAccessor()
 
+// availableVersions lists all known external versions for this group from most preferred to least preferred
 var availableVersions = []unversioned.GroupVersion{v1.SchemeGroupVersion}
 
 func init() {
