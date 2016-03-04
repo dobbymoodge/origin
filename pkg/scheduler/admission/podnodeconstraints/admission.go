@@ -13,6 +13,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	authorizationapi "github.com/openshift/origin/pkg/authorization/api"
+	"github.com/openshift/origin/pkg/authorization/authorizer"
 	"github.com/openshift/origin/pkg/client"
 	oadmission "github.com/openshift/origin/pkg/cmd/server/admission"
 	configlatest "github.com/openshift/origin/pkg/cmd/server/api/latest"
@@ -41,12 +42,14 @@ func NewPodNodeConstraints(config *api.PodNodeConstraintsConfig) admission.Inter
 
 type podNodeConstraints struct {
 	*admission.Handler
-	client client.Interface
-	config *api.PodNodeConstraintsConfig
+	client     client.Interface
+	config     *api.PodNodeConstraintsConfig
+	authorizer authorizer.Authorizer
 }
 
 var _ = oadmission.WantsOpenshiftClient(&podNodeConstraints{})
 var _ = oadmission.Validator(&podNodeConstraints{})
+var _ = oadmission.WantsAuthorizer(&podNodeConstraints{})
 
 func readConfig(reader io.Reader) (*api.PodNodeConstraintsConfig, error) {
 	if reader == nil || reflect.ValueOf(reader).IsNil() {
@@ -153,6 +156,10 @@ func (o *podNodeConstraints) SetOpenshiftClient(c client.Interface) {
 	o.client = c
 }
 
+func (o *podNodeConstraints) SetAuthorizer(a authorizer.Authorizer) {
+	o.authorizer = a
+}
+
 func (o *podNodeConstraints) Validate() error {
 	if o.client == nil {
 		return fmt.Errorf("PodNodeConstraints needs an Openshift client")
@@ -162,6 +169,7 @@ func (o *podNodeConstraints) Validate() error {
 
 // build LocalSubjectAccessReview struct to validate role via checkAccess
 func (o *podNodeConstraints) checkPodsBindAccess(attr admission.Attributes) (*authorizationapi.SubjectAccessReviewResponse, error) {
+
 	sar := &authorizationapi.LocalSubjectAccessReview{
 		Action: authorizationapi.AuthorizationAttributes{
 			Verb:         "create",

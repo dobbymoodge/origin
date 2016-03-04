@@ -34,6 +34,7 @@ import (
 	knet "k8s.io/kubernetes/pkg/util/net"
 	saadmit "k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 
+	"github.com/openshift/origin/pkg/authorization/authorizer"
 	"github.com/openshift/origin/pkg/cmd/flagtypes"
 	oadmission "github.com/openshift/origin/pkg/cmd/server/admission"
 	configapi "github.com/openshift/origin/pkg/cmd/server/api"
@@ -57,7 +58,7 @@ type MasterConfig struct {
 	CloudProvider     cloudprovider.Interface
 }
 
-func BuildKubernetesMasterConfig(options configapi.MasterConfig, requestContextMapper kapi.RequestContextMapper, kubeClient *kclient.Client, projectCache *projectcache.ProjectCache) (*MasterConfig, error) {
+func BuildKubernetesMasterConfig(options configapi.MasterConfig, requestContextMapper kapi.RequestContextMapper, kubeClient *kclient.Client, projectCache *projectcache.ProjectCache, authorizer authorizer.Authorizer) (*MasterConfig, error) {
 	if options.KubernetesMasterConfig == nil {
 		return nil, errors.New("insufficient information to build KubernetesMasterConfig")
 	}
@@ -140,6 +141,7 @@ func BuildKubernetesMasterConfig(options configapi.MasterConfig, requestContextM
 	pluginInitializer := oadmission.PluginInitializer{
 		OpenshiftClient: privilegedLoopbackOpenShiftClient,
 		ProjectCache:    projectCache,
+		Authorizer:      authorizer,
 	}
 
 	plugins := []admission.Interface{}
