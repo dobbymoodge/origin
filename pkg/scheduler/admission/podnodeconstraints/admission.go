@@ -8,6 +8,7 @@ import (
 	admission "k8s.io/kubernetes/pkg/admission"
 	kapi "k8s.io/kubernetes/pkg/api"
 	kapierrors "k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -45,6 +46,26 @@ type podNodeConstraints struct {
 	config *api.PodNodeConstraintsConfig
 }
 
+var resourcesToAdmit = map[unversioned.GroupResource]unversioned.GroupKind{
+	kapi.Resource("pods"):                   kapi.Kind("Pod"),
+	kapi.Resource("replicationcontrollers"): kapi.Kind("ReplicationController"),
+	extensions.Resource("deployments"):      extensions.Kind("Deployment"),
+	extensions.Resource("replicasets"):      extensions.Kind("ReplicaSet"),
+	extensions.Resource("jobs"):             extensions.Kind("Job"),
+	deployapi.Resource("deploymentconfigs"): deployapi.Kind("DeploymentConfig"),
+}
+
+func shouldAdmitResource(resource unversioned.GroupResource, kind unversioned.GroupKind) (bool, error) {
+	expectedKind, shouldAdmit := resourcesToAdmit[resource]
+	if !shouldAdmit {
+		return false, nil
+	}
+	if expectedKind != kind {
+		return false, fmt.Errorf("Unexpected resource kind %v for resource %v", &kind, &resource)
+	}
+	return true, nil
+}
+
 var _ = oadmission.WantsOpenshiftClient(&podNodeConstraints{})
 var _ = oadmission.Validator(&podNodeConstraints{})
 
@@ -74,20 +95,15 @@ func (o *podNodeConstraints) Admit(attr admission.Attributes) error {
 		attr.GetSubresource() != "":
 		return nil
 	}
-	switch attr.GetResource() {
-	// We only want CREATE for pods
-	case kapi.Resource("pods"):
-		if attr.GetOperation() == admission.Update {
-			return nil
-		}
-	// But we want CREATE & UPDATE for every other resource
-	case kapi.Resource("replicationcontrollers"),
-		extensions.Resource("deployments"),
-		extensions.Resource("replicasets"),
-		extensions.Resource("jobs"),
-		deployapi.Resource("deploymentconfigs"):
-		// These are the only types we care about
-	default:
+	shouldAdmit, err := shouldAdmitResource(attr.GetResource(), attr.GetKind())
+	if err != nil {
+		return err
+	}
+	if !shouldAdmit {
+		return nil
+	}
+	// Only check Create operation on pods
+	if attr.GetResource() == kapi.Resource("pods") && attr.GetOperation() != admission.Create {
 		return nil
 	}
 	ps, err := o.getPodSpec(attr)
