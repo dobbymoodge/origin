@@ -176,9 +176,12 @@ func BuildMasterConfig(options configapi.MasterConfig) (*MasterConfig, error) {
 		admissionControlPluginNames = options.AdmissionConfig.PluginOrderOverride
 	}
 
+	authorizer := newAuthorizer(policyClient, options.ProjectConfig.ProjectRequestMessage)
+
 	pluginInitializer := oadmission.PluginInitializer{
 		OpenshiftClient: privilegedLoopbackOpenShiftClient,
 		ProjectCache:    projectCache,
+		Authorizer:      authorizer,
 	}
 
 	plugins := []admission.Interface{}
@@ -206,8 +209,6 @@ func BuildMasterConfig(options configapi.MasterConfig) (*MasterConfig, error) {
 	}
 
 	plug, plugStart := newControllerPlug(options, client)
-
-	authorizer := newAuthorizer(policyClient, options.ProjectConfig.ProjectRequestMessage)
 
 	config := &MasterConfig{
 		Options: options,
