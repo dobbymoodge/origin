@@ -50,7 +50,7 @@ var _ = oadmission.Validator(&podNodeConstraints{})
 
 func readConfig(reader io.Reader) (*api.PodNodeConstraintsConfig, error) {
 	if reader == nil || reflect.ValueOf(reader).IsNil() {
-		return &api.PodNodeConstraintsConfig{}, nil
+		return nil, nil
 	}
 
 	obj, err := configlatest.ReadYAML(reader)
@@ -77,16 +77,15 @@ func (o *podNodeConstraints) Admit(attr admission.Attributes) error {
 	switch attr.GetResource() {
 	// We only want CREATE for pods
 	case kapi.Resource("pods"):
-		if attr.GetOperation() == admission.Update {
+		if attr.GetOperation() != admission.Create {
 			return nil
 		}
 	// But we want CREATE & UPDATE for every other resource
-	case kapi.Resource("replicationcontrollers"),
+	case kapi.Resource("replicationcontrollers"), // These are the only types we care about
 		extensions.Resource("deployments"),
 		extensions.Resource("replicasets"),
 		extensions.Resource("jobs"),
 		deployapi.Resource("deploymentconfigs"):
-		// These are the only types we care about
 	default:
 		return nil
 	}
@@ -118,31 +117,31 @@ func (o *podNodeConstraints) getPodSpec(attr admission.Attributes) (kapi.PodSpec
 
 // validate PodSpec if NodeName or NodeSelector are specified
 func (o *podNodeConstraints) admitPodSpec(attr admission.Attributes, ps kapi.PodSpec) error {
-	lbls := []string{}
+	matchingLabels := []string{}
 	// nodeSelector blacklist filter
 	if len(ps.NodeSelector) > 0 {
-		for nslbl := range ps.NodeSelector {
-			for _, bllbl := range o.config.NodeSelectorLabelBlacklist {
-				if bllbl == nslbl {
-					lbls = append(lbls, bllbl)
+		for nodeSelectorLabel := range ps.NodeSelector {
+			for _, blacklistLabel := range o.config.NodeSelectorLabelBlacklist {
+				if blacklistLabel == nodeSelectorLabel {
+					matchingLabels = append(matchingLabels, blacklistLabel)
 				}
 			}
 		}
 	}
 	// nodeName constraint
-	if len(ps.NodeName) > 0 || len(lbls) > 0 {
+	if len(ps.NodeName) > 0 || len(matchingLabels) > 0 {
 		allow, err := o.checkPodsBindAccess(attr)
 		if err != nil {
 			return err
 		}
 		if allow != nil && !allow.Allowed {
 			switch {
-			case len(ps.NodeName) > 0 && len(lbls) == 0:
+			case len(ps.NodeName) > 0 && len(matchingLabels) == 0:
 				return admission.NewForbidden(attr, fmt.Errorf("node selection by nodeName is prohibited by policy for your role"))
-			case len(ps.NodeName) == 0 && len(lbls) > 0:
-				return admission.NewForbidden(attr, fmt.Errorf("node selection by label(s) %v is prohibited by policy for your role", lbls))
-			case len(ps.NodeName) > 0 && len(lbls) > 0:
-				return admission.NewForbidden(attr, fmt.Errorf("node selection by nodeName and label(s) %v is prohibited by policy for your role", lbls))
+			case len(ps.NodeName) == 0 && len(matchingLabels) > 0:
+				return admission.NewForbidden(attr, fmt.Errorf("node selection by label(s) %v is prohibited by policy for your role", matchingLabels))
+			case len(ps.NodeName) > 0 && len(matchingLabels) > 0:
+				return admission.NewForbidden(attr, fmt.Errorf("node selection by nodeName and label(s) %v is prohibited by policy for your role", matchingLabels))
 			}
 		}
 	}
