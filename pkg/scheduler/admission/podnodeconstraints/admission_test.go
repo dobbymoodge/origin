@@ -7,8 +7,7 @@ import (
 
 	_ "github.com/openshift/origin/pkg/api/install"
 	authorizationapi "github.com/openshift/origin/pkg/authorization/api"
-	"github.com/openshift/origin/pkg/client"
-	"github.com/openshift/origin/pkg/client/testclient"
+	"github.com/openshift/origin/pkg/authorization/authorizer"
 	oadmission "github.com/openshift/origin/pkg/cmd/server/admission"
 	deployapi "github.com/openshift/origin/pkg/deploy/api"
 	"github.com/openshift/origin/pkg/scheduler/admission/podnodeconstraints/api"
@@ -18,9 +17,9 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/auth/user"
-	ktestclient "k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/serviceaccount"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 func emptyConfig() *api.PodNodeConstraintsConfig {
@@ -194,38 +193,53 @@ func TestPodNodeConstraints(t *testing.T) {
 	}
 	for i, tc := range tests {
 		var expectedError error
-		client := fakeClient("pods/binding", tc.reviewResponse)
+		errPrefix := fmt.Sprintf("%d", i)
 		prc := NewPodNodeConstraints(tc.config)
-		prc.(oadmission.WantsOpenshiftClient).SetOpenshiftClient(client)
+		prc.(oadmission.WantsAuthorizer).SetAuthorizer(fakeAuthorizer(t))
+		err := prc.(oadmission.Validator).Validate()
+		if err != nil {
+			checkAdmitError(t, err, expectedError, errPrefix)
+			continue
+		}
 		attrs := admission.NewAttributesRecord(tc.resource, kapi.Kind("Pod"), ns, "test", kapi.Resource("pods"), "", admission.Create, tc.userinfo)
 		if tc.expectedErrorMsg != "" {
 			expectedError = admission.NewForbidden(attrs, fmt.Errorf(tc.expectedErrorMsg))
 		}
-		err := prc.Admit(attrs)
-		checkAdmitError(t, err, expectedError, fmt.Sprintf("%d", i))
+		err = prc.Admit(attrs)
+		checkAdmitError(t, err, expectedError, errPrefix)
 	}
 }
 
 func TestPodNodeConstraintsPodUpdate(t *testing.T) {
 	ns := kapi.NamespaceDefault
 	var expectedError error
+	errPrefix := "PodUpdate"
 	prc := NewPodNodeConstraints(testConfig())
-	client := fakeClient("pods/binding", reviewResponse(false, ""))
-	prc.(oadmission.WantsOpenshiftClient).SetOpenshiftClient(client)
+	prc.(oadmission.WantsAuthorizer).SetAuthorizer(fakeAuthorizer(t))
+	err := prc.(oadmission.Validator).Validate()
+	if err != nil {
+		checkAdmitError(t, err, expectedError, errPrefix)
+		return
+	}
 	attrs := admission.NewAttributesRecord(nodeNamePod(), kapi.Kind("Pod"), ns, "test", kapi.Resource("pods"), "", admission.Update, serviceaccount.UserInfo("", "", ""))
-	err := prc.Admit(attrs)
-	checkAdmitError(t, err, expectedError, "PodUpdate")
+	err = prc.Admit(attrs)
+	checkAdmitError(t, err, expectedError, errPrefix)
 }
 
 func TestPodNodeConstraintsNonHandledResources(t *testing.T) {
 	ns := kapi.NamespaceDefault
+	errPrefix := "ResourceQuotaTest"
 	var expectedError error
 	prc := NewPodNodeConstraints(testConfig())
-	client := fakeClient("pods/binding", reviewResponse(false, ""))
-	prc.(oadmission.WantsOpenshiftClient).SetOpenshiftClient(client)
+	prc.(oadmission.WantsAuthorizer).SetAuthorizer(fakeAuthorizer(t))
+	err := prc.(oadmission.Validator).Validate()
+	if err != nil {
+		checkAdmitError(t, err, expectedError, errPrefix)
+		return
+	}
 	attrs := admission.NewAttributesRecord(resourceQuota(), kapi.Kind("ResourceQuota"), ns, "test", kapi.Resource("resourcequotas"), "", admission.Create, serviceaccount.UserInfo("", "", ""))
-	err := prc.Admit(attrs)
-	checkAdmitError(t, err, expectedError, "ResourceQuotaTest")
+	err = prc.Admit(attrs)
+	checkAdmitError(t, err, expectedError, errPrefix)
 }
 
 func TestPodNodeConstraintsResources(t *testing.T) {
@@ -247,12 +261,6 @@ func TestPodNodeConstraintsResources(t *testing.T) {
 		groupresource unversioned.GroupResource
 		prefix        string
 	}{
-		// {
-		// 	resource:      pod,
-		// 	kind:          kapi.Kind("Pod"),
-		// 	groupresource: kapi.Resource("pods"),
-		// 	prefix:        "Pod",
-		// },
 		{
 			resource:      replicationController,
 			kind:          kapi.Kind("ReplicationController"),
@@ -315,16 +323,20 @@ func TestPodNodeConstraintsResources(t *testing.T) {
 			for _, tp := range testparams {
 				for _, top := range testops {
 					var expectedError error
-					client := fakeClient("pods/binding", tc.reviewResponse)
+					errPrefix := fmt.Sprintf("%s; %s; %s", tr.prefix, tp.prefix, top.operation)
 					prc := NewPodNodeConstraints(tc.config)
-					prc.(oadmission.WantsOpenshiftClient).SetOpenshiftClient(client)
+					prc.(oadmission.WantsAuthorizer).SetAuthorizer(fakeAuthorizer(t))
+					err := prc.(oadmission.Validator).Validate()
+					if err != nil {
+						checkAdmitError(t, err, expectedError, errPrefix)
+						continue
+					}
 					attrs := admission.NewAttributesRecord(tr.resource(tp.nodeselector), tr.kind, ns, "test", tr.groupresource, "", top.operation, tc.userinfo)
 					if tp.expectedErrorMsg != "" {
 						expectedError = admission.NewForbidden(attrs, fmt.Errorf(tp.expectedErrorMsg))
 					}
-					prefix := fmt.Sprintf("%s; %s; %s", tr.prefix, tp.prefix, top.operation)
-					err := prc.Admit(attrs)
-					checkAdmitError(t, err, expectedError, prefix)
+					err = prc.Admit(attrs)
+					checkAdmitError(t, err, expectedError, errPrefix)
 				}
 			}
 		}
@@ -344,22 +356,32 @@ func checkAdmitError(t *testing.T, err error, expectedError error, prefix string
 	}
 }
 
-func fakeClient(expectedResource string, reviewResponse *authorizationapi.SubjectAccessReviewResponse) client.Interface {
-	emptyResponse := &authorizationapi.SubjectAccessReviewResponse{}
+type fakeTestAuthorizer struct {
+	t *testing.T
+}
 
-	fake := &testclient.Fake{}
-	fake.AddReactor("create", "localsubjectaccessreviews", func(action ktestclient.Action) (handled bool, ret runtime.Object, err error) {
-		review, ok := action.(ktestclient.CreateAction).GetObject().(*authorizationapi.LocalSubjectAccessReview)
-		if !ok {
-			return true, emptyResponse, fmt.Errorf("unexpected object received: %#v", review)
-		}
-		if review.Action.Resource != expectedResource {
-			return true, emptyResponse, fmt.Errorf("unexpected resource received: %s. expected: %s",
-				review.Action.Resource, expectedResource)
-		}
-		return true, reviewResponse, nil
-	})
-	return fake
+func fakeAuthorizer(t *testing.T) authorizer.Authorizer {
+	return &fakeTestAuthorizer{
+		t: t,
+	}
+}
+
+func (a *fakeTestAuthorizer) Authorize(ctx kapi.Context, passedAttributes authorizer.AuthorizationAttributes) (bool, string, error) {
+	a.t.Logf("Authorize: ctx: %#v", ctx)
+	ui, ok := kapi.UserFrom(ctx)
+	if !ok {
+		return false, "", fmt.Errorf("No valid UserInfo for Context")
+	}
+	// User with pods/bindings. permission:
+	if ui.GetName() == "system:serviceaccount:openshift-infra:daemonset-controller" {
+		return true, "", nil
+	}
+	// User without pods/bindings. permission:
+	return false, "", nil
+}
+
+func (a *fakeTestAuthorizer) GetAllowedSubjects(ctx kapi.Context, attributes authorizer.AuthorizationAttributes) (sets.String, sets.String, error) {
+	return nil, nil, nil
 }
 
 func reviewResponse(allowed bool, msg string) *authorizationapi.SubjectAccessReviewResponse {

@@ -11,9 +11,9 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/util/sets"
+	// "k8s.io/kubernetes/pkg/util/sets"
 
-	authorizationapi "github.com/openshift/origin/pkg/authorization/api"
+	// authorizationapi "github.com/openshift/origin/pkg/authorization/api"
 	"github.com/openshift/origin/pkg/authorization/authorizer"
 	"github.com/openshift/origin/pkg/client"
 	oadmission "github.com/openshift/origin/pkg/cmd/server/admission"
@@ -68,7 +68,7 @@ func shouldAdmitResource(resource unversioned.GroupResource, kind unversioned.Gr
 	return true, nil
 }
 
-var _ = oadmission.WantsOpenshiftClient(&podNodeConstraints{})
+// var _ = oadmission.WantsOpenshiftClient(&podNodeConstraints{})
 var _ = oadmission.Validator(&podNodeConstraints{})
 var _ = oadmission.WantsAuthorizer(&podNodeConstraints{})
 
@@ -154,7 +154,7 @@ func (o *podNodeConstraints) admitPodSpec(attr admission.Attributes, ps kapi.Pod
 		if err != nil {
 			return err
 		}
-		if allow != nil && !allow.Allowed {
+		if !allow {
 			switch {
 			case len(ps.NodeName) > 0 && len(matchingLabels) == 0:
 				return admission.NewForbidden(attr, fmt.Errorf("node selection by nodeName is prohibited by policy for your role"))
@@ -168,32 +168,33 @@ func (o *podNodeConstraints) admitPodSpec(attr admission.Attributes, ps kapi.Pod
 	return nil
 }
 
-func (o *podNodeConstraints) SetOpenshiftClient(c client.Interface) {
-	o.client = c
-}
+// func (o *podNodeConstraints) SetOpenshiftClient(c client.Interface) {
+// 	o.client = c
+// }
 
 func (o *podNodeConstraints) SetAuthorizer(a authorizer.Authorizer) {
 	o.authorizer = a
 }
 
 func (o *podNodeConstraints) Validate() error {
-	if o.client == nil {
-		return fmt.Errorf("PodNodeConstraints needs an Openshift client")
+	// if o.client == nil {
+	// 	return fmt.Errorf("PodNodeConstraints needs an Openshift client")
+	// }
+	if o.authorizer == nil {
+		return fmt.Errorf("PodNodeConstraints needs an Openshift Authorizer")
 	}
 	return nil
 }
 
 // build LocalSubjectAccessReview struct to validate role via checkAccess
-func (o *podNodeConstraints) checkPodsBindAccess(attr admission.Attributes) (*authorizationapi.SubjectAccessReviewResponse, error) {
+func (o *podNodeConstraints) checkPodsBindAccess(attr admission.Attributes) (bool, error) {
+	ctx := kapi.WithUser(kapi.WithNamespace(kapi.NewContext(), attr.GetNamespace()), attr.GetUserInfo())
 
-	sar := &authorizationapi.LocalSubjectAccessReview{
-		Action: authorizationapi.AuthorizationAttributes{
-			Verb:         "create",
-			Resource:     "pods/binding",
-			ResourceName: attr.GetName(),
-		},
-		User:   attr.GetUserInfo().GetName(),
-		Groups: sets.NewString(attr.GetUserInfo().GetGroups()...),
+	authzAttr := authorizer.DefaultAuthorizationAttributes{
+		Verb:         string(attr.GetOperation()),
+		Resource:     fmt.Sprintf("pods/binding.%s", kapi.GroupName),
+		ResourceName: attr.GetName(),
 	}
-	return o.client.LocalSubjectAccessReviews(attr.GetNamespace()).Create(sar)
+	allow, _, err := o.authorizer.Authorize(ctx, authzAttr)
+	return allow, err
 }
