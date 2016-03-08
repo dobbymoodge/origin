@@ -4,16 +4,12 @@ package integration
 
 import (
 	"testing"
-	"time"
 
 	kapi "k8s.io/kubernetes/pkg/api"
 	kapierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	kclient "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/util/intstr"
-	watchapi "k8s.io/kubernetes/pkg/watch"
 
 	"github.com/openshift/origin/pkg/client"
 	policy "github.com/openshift/origin/pkg/cmd/admin/policy"
@@ -50,51 +46,6 @@ func TestPodNodeConstraintsAdmissionPluginSetNodeSelectorNonAdmin(t *testing.T) 
 	}
 	oclient, kclient := setupUserPodNodeConstraintsTest(t, config, "derples")
 	testPodNodeConstraintsObjectCreationWithPodTemplate(t, "set node selector, regular user", kclient, oclient, "", map[string]string{"hostname": "foo"}, true)
-}
-
-func TestPodNodeConstraintsAdmissionPluginWithDaemonSetProhibitNodeTargeting(t *testing.T) {
-	config := &pluginapi.PodNodeConstraintsConfig{
-		NodeSelectorLabelBlacklist: []string{"foo"},
-	}
-	ns := kapi.NamespaceDefault
-	_, kclient := setupClusterAdminPodNodeConstraintsTest(t, config)
-
-	node := &kapi.Node{}
-	node.Labels = map[string]string{"foo": "bar"}
-	node.Name = "mynode"
-	node.Status.Conditions = []kapi.NodeCondition{
-		{
-			Type:   kapi.NodeReady,
-			Status: kapi.ConditionTrue,
-		},
-	}
-	_, err := kclient.Nodes().Create(node)
-	checkErr(t, err)
-
-	ds := testPodNodeConstraintsDaemonSet()
-
-	_, err = kclient.Extensions().DaemonSets(ns).Create(ds)
-	checkErr(t, err)
-
-	podWatch, err := kclient.Pods(ns).Watch(kapi.ListOptions{FieldSelector: fields.Everything(), ResourceVersion: "0"})
-	checkErr(t, err)
-	defer podWatch.Stop()
-	for {
-		select {
-		case e := <-podWatch.ResultChan():
-			if e.Type == watchapi.Added {
-				pod, ok := e.Object.(*kapi.Pod)
-				if !ok {
-					continue
-				}
-				if pod.Labels["a"] == "b" {
-					return
-				}
-			}
-		case <-time.After(10 * time.Second):
-			t.Fatalf("timed out")
-		}
-	}
 }
 
 func setupClusterAdminPodNodeConstraintsTest(t *testing.T, pluginConfig *pluginapi.PodNodeConstraintsConfig) (*client.Client, *kclient.Client) {
@@ -267,26 +218,6 @@ func testPodNodeConstraintsDeploymentConfig(nodeName string, nodeSelector map[st
 	dc.Spec.Template.Spec = testPodNodeConstraintsPodSpec(nodeName, nodeSelector)
 	dc.Spec.Selector = map[string]string{"foo": "bar"}
 	return dc
-}
-
-func testPodNodeConstraintsDaemonSet() *extensions.DaemonSet {
-	ds := &extensions.DaemonSet{}
-	ds.Name = "foo"
-	ds.Spec.Selector = &unversioned.LabelSelector{}
-	ds.Spec.Template.Labels = map[string]string{"a": "b"}
-	ds.Spec.Template.Spec.Containers = []kapi.Container{
-		{
-			Name:            "test",
-			Image:           "test_image",
-			ImagePullPolicy: kapi.PullIfNotPresent,
-		},
-	}
-	ds.Spec.UpdateStrategy.Type = extensions.RollingUpdateDaemonSetStrategyType
-	ds.Spec.UpdateStrategy.RollingUpdate = &extensions.RollingUpdateDaemonSet{
-		MaxUnavailable: intstr.FromInt(1),
-	}
-	ds.Spec.UniqueLabelKey = "foo-label"
-	return ds
 }
 
 // testPodNodeConstraintsObjectCreationWithPodTemplate attemps to create different object types that contain pod templates

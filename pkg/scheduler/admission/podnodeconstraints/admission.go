@@ -191,8 +191,9 @@ func (o *podNodeConstraints) checkPodsBindAccess(attr admission.Attributes) (boo
 	ctx := kapi.WithUser(kapi.WithNamespace(kapi.NewContext(), attr.GetNamespace()), attr.GetUserInfo())
 
 	authzAttr := authorizer.DefaultAuthorizationAttributes{
-		Verb:         string(attr.GetOperation()),
-		Resource:     fmt.Sprintf("pods/binding.%s", kapi.GroupName),
+		Verb:         "create",
+		Resource:     "pods/binding",
+		APIGroup:     kapi.GroupName,
 		ResourceName: attr.GetName(),
 	}
 	allow, _, err := o.authorizer.Authorize(ctx, authzAttr)
