@@ -3,6 +3,7 @@ package podnodeconstraints
 import (
 	"bytes"
 	"fmt"
+	"reflect"
 	"testing"
 
 	_ "github.com/openshift/origin/pkg/api/install"
@@ -15,6 +16,7 @@ import (
 	admission "k8s.io/kubernetes/pkg/admission"
 	kapi "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -405,5 +407,85 @@ nodeSelectorLabelBlacklist:
 	}
 	if len(config.NodeSelectorLabelBlacklist) == 0 {
 		t.Fatalf("NodeSelectorLabelBlacklist didn't take specified value")
+	}
+}
+
+var podSpecType = reflect.TypeOf(kapi.PodSpec{})
+
+func hasPodSpec(t reflect.Type) bool {
+	switch t.Kind() {
+	case reflect.Struct:
+		if t == podSpecType {
+			return true
+		}
+		for i := 1; i < t.NumField(); i++ {
+			if hasPodSpec(t.Field(i).Type) {
+				return true
+			}
+		}
+	case reflect.Array, reflect.Slice, reflect.Chan, reflect.Map, reflect.Ptr:
+		return hasPodSpec(t.Elem())
+	}
+	return false
+}
+
+func internalGroupVersions() []unversioned.GroupVersion {
+	groupVersions := registered.EnabledVersions()
+	groups := map[string]struct{}{}
+	for _, gv := range groupVersions {
+		groups[gv.Group] = struct{}{}
+	}
+	result := []unversioned.GroupVersion{}
+	for group := range groups {
+		result = append(result, unversioned.GroupVersion{Group: group, Version: runtime.APIVersionInternal})
+	}
+	return result
+}
+
+func isList(t reflect.Type) bool {
+	if t.Kind() != reflect.Struct {
+		return false
+	}
+
+	_, hasListMeta := t.FieldByName("ListMeta")
+	return hasListMeta
+}
+
+func kindsWithPodSpecs() []unversioned.GroupKind {
+	result := []unversioned.GroupKind{}
+	for _, gv := range internalGroupVersions() {
+		knownTypes := kapi.Scheme.KnownTypes(gv)
+		for kind, knownType := range knownTypes {
+			if !isList(knownType) && hasPodSpec(knownType) {
+				result = append(result, unversioned.GroupKind{Group: gv.Group, Kind: kind})
+			}
+		}
+	}
+	return result
+}
+
+func knownResourceKinds() map[unversioned.GroupKind]struct{} {
+	result := map[unversioned.GroupKind]struct{}{}
+	for _, ka := range resourcesToAdmit {
+		result[ka] = struct{}{}
+	}
+	for _, ki := range resourcesToIgnore {
+		result[ki] = struct{}{}
+	}
+	return result
+}
+
+func TestResourcesToAdmit(t *testing.T) {
+	known := knownResourceKinds()
+	detected := kindsWithPodSpecs()
+	for _, k := range detected {
+		if _, isKnown := known[k]; !isKnown {
+			t.Errorf("Unknown resource kind %s contains a PodSpec", (&k).String())
+			continue
+		}
+		delete(known, k)
+	}
+	if len(known) > 0 {
+		t.Errorf("These known kinds were not detected to have a PodSpec: %#v", known)
 	}
 }

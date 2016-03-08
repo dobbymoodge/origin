@@ -48,6 +48,8 @@ type podNodeConstraints struct {
 	authorizer authorizer.Authorizer
 }
 
+// resourcesToAdmit is a map of resources and corresponding kinds of things that
+// we want handled in this plugin
 var resourcesToAdmit = map[unversioned.GroupResource]unversioned.GroupKind{
 	kapi.Resource("pods"):                   kapi.Kind("Pod"),
 	kapi.Resource("replicationcontrollers"): kapi.Kind("ReplicationController"),
@@ -55,6 +57,12 @@ var resourcesToAdmit = map[unversioned.GroupResource]unversioned.GroupKind{
 	extensions.Resource("replicasets"):      extensions.Kind("ReplicaSet"),
 	extensions.Resource("jobs"):             extensions.Kind("Job"),
 	deployapi.Resource("deploymentconfigs"): deployapi.Kind("DeploymentConfig"),
+}
+
+// resourcesToIgnore is a list of resource kinds that contain a PodSpec that
+// we choose not to handle in this plugin
+var resourcesToIgnore = []unversioned.GroupKind{
+	extensions.Kind("DaemonSet"),
 }
 
 func shouldAdmitResource(resource unversioned.GroupResource, kind unversioned.GroupKind) (bool, error) {
