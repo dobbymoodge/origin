@@ -2,6 +2,7 @@ package api
 
 import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // PodNodeConstraintsConfig is the configuration for the pod node name
@@ -13,5 +14,5 @@ import (
 type PodNodeConstraintsConfig struct {
 	unversioned.TypeMeta
 	// NodeSelectorLabelBlacklist specifies a list of labels which cannot be set by entities without the "pods/binding" permission
-	NodeSelectorLabelBlacklist []string
+	NodeSelectorLabelBlacklist sets.String
 }

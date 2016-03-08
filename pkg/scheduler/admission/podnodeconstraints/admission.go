@@ -11,11 +11,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	// "k8s.io/kubernetes/pkg/util/sets"
 
-	// authorizationapi "github.com/openshift/origin/pkg/authorization/api"
 	"github.com/openshift/origin/pkg/authorization/authorizer"
-	"github.com/openshift/origin/pkg/client"
 	oadmission "github.com/openshift/origin/pkg/cmd/server/admission"
 	configlatest "github.com/openshift/origin/pkg/cmd/server/api/latest"
 	deployapi "github.com/openshift/origin/pkg/deploy/api"
@@ -43,7 +40,6 @@ func NewPodNodeConstraints(config *api.PodNodeConstraintsConfig) admission.Inter
 
 type podNodeConstraints struct {
 	*admission.Handler
-	client     client.Interface
 	config     *api.PodNodeConstraintsConfig
 	authorizer authorizer.Authorizer
 }
@@ -68,7 +64,6 @@ func shouldAdmitResource(resource unversioned.GroupResource, kind unversioned.Gr
 	return true, nil
 }
 
-// var _ = oadmission.WantsOpenshiftClient(&podNodeConstraints{})
 var _ = oadmission.Validator(&podNodeConstraints{})
 var _ = oadmission.WantsAuthorizer(&podNodeConstraints{})
 
@@ -139,13 +134,9 @@ func (o *podNodeConstraints) getPodSpec(attr admission.Attributes) (kapi.PodSpec
 func (o *podNodeConstraints) admitPodSpec(attr admission.Attributes, ps kapi.PodSpec) error {
 	matchingLabels := []string{}
 	// nodeSelector blacklist filter
-	if len(ps.NodeSelector) > 0 {
-		for nodeSelectorLabel := range ps.NodeSelector {
-			for _, blacklistLabel := range o.config.NodeSelectorLabelBlacklist {
-				if blacklistLabel == nodeSelectorLabel {
-					matchingLabels = append(matchingLabels, blacklistLabel)
-				}
-			}
+	for nodeSelectorLabel := range ps.NodeSelector {
+		if o.config.NodeSelectorLabelBlacklist.Has(nodeSelectorLabel) {
+			matchingLabels = append(matchingLabels, nodeSelectorLabel)
 		}
 	}
 	// nodeName constraint

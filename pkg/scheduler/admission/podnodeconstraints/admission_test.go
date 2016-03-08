@@ -28,9 +28,9 @@ func emptyConfig() *api.PodNodeConstraintsConfig {
 
 func testConfig() *api.PodNodeConstraintsConfig {
 	return &api.PodNodeConstraintsConfig{
-		NodeSelectorLabelBlacklist: []string{
+		NodeSelectorLabelBlacklist: sets.NewString(
 			"bogus",
-		},
+		),
 	}
 }
 
